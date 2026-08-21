@@ -33,11 +33,11 @@ const TEST_MODEL = ENV.TABBIT_TEST_MODEL || process.env.TABBIT_TEST_MODEL || '';
 const IS_PRO = !process.argv.includes('--no-pro');
 const ONLY_STEP = (process.argv.find(a => a.startsWith('--step=')) || '').split('=')[1] || null;
 
-const BASE = 'https://web.tabbit.ai';
+const BASE = ENV.TABBIT_BASE_URL || process.env.TABBIT_BASE_URL || 'https://web.tabbit.ai';
 mkdirSync('logs', { recursive: true });
 
 if (!COOKIE) {
-  console.error('✗ 缺少 TABBIT_COOKIE。请把 .env.example 复制为 .env 并填入 web.tabbit.ai 的 Cookie。');
+  console.error(`✗ 缺少 TABBIT_COOKIE。请把 .env.example 复制为 .env 并填入 ${BASE} 的 Cookie。`);
   process.exit(1);
 }
 

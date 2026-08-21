@@ -1,9 +1,21 @@
 // lib/tabbit.mjs — Tabbit 认证 + 指纹 + SSE 解析（探测用，含 Pro 标记位）
 
 import { randomUUID, createHash, createHmac } from 'node:crypto';
+import { config } from '../../src/config.mjs';
 
 export const DEFAULT_SIGN_KEY = 'f8d0e6a73f8d4b1a9c3d2e1f9a4b7c6d';
-export const BASE = 'https://web.tabbit.ai';
+
+// Tabbit Web 后端地址（国际版 web.tabbit.ai；国内版设为对应域名即可，协议一致）
+export const BASE = (config.baseUrl || 'https://web.tabbit.ai').replace(/\/$/, '');
+
+// 由 BASE 推导 cookie 作用域：含完整 host 与裸域，供 CDP 过滤使用
+//   web.tabbit.ai    → ['web.tabbit.ai', '.tabbit.ai']
+//   web.tabbit-ai.com → ['web.tabbit-ai.com', '.tabbit-ai.com']
+export function cookieDomains(base = BASE) {
+  const host = new URL(base).hostname.replace(/^www\./, '');
+  const root = host.split('.').slice(1).join('.');
+  return root ? [host, '.' + root] : [host];
+}
 
 // ─── 基础哈希 ───────────────────────────────────────────────
 export function sha256Hex(text) {
@@ -68,8 +80,8 @@ export function baseHeaders(cookie, version, isDefault = true) {
     Cookie: cookie,
     'trace-id': randomUUID(),
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
-    Origin: 'https://web.tabbit.ai',
-    Referer: 'https://web.tabbit.ai/',
+    Origin: BASE,
+    Referer: `${BASE}/`,
     ...fingerprintHeaders(version, isDefault),
   };
 }

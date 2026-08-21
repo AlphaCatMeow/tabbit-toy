@@ -8,7 +8,11 @@
 //
 // 零依赖：使用 Node 22+ 内置 WebSocket 与全局 fetch。
 
+import { config } from '../../src/config.mjs';
+import { cookieDomains } from './tabbit.mjs';
+
 const DEFAULT_PORT = 9222;
+const DEFAULT_BASE = config.baseUrl || 'https://web.tabbit.ai';
 
 // ─── 基础 CDP 工具 ─────────────────────────────────────────
 
@@ -48,26 +52,28 @@ function cdpCall(wsUrl, method, params = {}, timeoutMs = 8000) {
   });
 }
 
-// 找到 web.tabbit.ai 的页面 target（优先 session 页，其次任意 tabbit 页面）
-function findTabbitPage(targets) {
-  const pages = targets.filter(t => t.type === 'page' && t.url.includes('web.tabbit.ai'));
+// 找到目标域的页面 target（优先 session 页，其次任意该域页面）
+function findTabbitPage(targets, baseUrl = DEFAULT_BASE) {
+  const host = new URL(baseUrl).hostname;
+  const pages = targets.filter(t => t.type === 'page' && t.url.includes(host));
   if (pages.length === 0) return null;
   return pages.find(t => t.url.includes('/session/')) || pages[0];
 }
 
 // ─── 对外 API ──────────────────────────────────────────────
 
-// 拉取 web.tabbit.ai 域全部 cookie，返回拼接字符串；浏览器未开/未登录返回 null
-export async function fetchTabbitCookies(port = DEFAULT_PORT) {
+// 拉取目标域全部 cookie，返回拼接字符串；浏览器未开/未登录返回 null
+export async function fetchTabbitCookies(port = DEFAULT_PORT, baseUrl = DEFAULT_BASE) {
   const targets = await listTargets(port);
-  const page = findTabbitPage(targets);
+  const page = findTabbitPage(targets, baseUrl);
   if (!page) {
-    throw new Error('浏览器未打开 web.tabbit.ai 页面');
+    throw new Error(`浏览器未打开 ${baseUrl} 页面`);
   }
   const { cookies } = await cdpCall(page.webSocketDebuggerUrl, 'Network.getAllCookies');
-  const web = (cookies || []).filter(c => ['web.tabbit.ai', '.tabbit.ai'].includes(c.domain));
+  const domains = cookieDomains(baseUrl);
+  const web = (cookies || []).filter(c => domains.includes(c.domain));
   if (web.length === 0) {
-    throw new Error('web.tabbit.ai 下无 cookie（可能未登录）');
+    throw new Error(`${baseUrl} 下无 cookie（可能未登录）`);
   }
   return {
     cookie: web.map(c => `${c.name}=${c.value}`).join('; '),
@@ -77,10 +83,10 @@ export async function fetchTabbitCookies(port = DEFAULT_PORT) {
 }
 
 // 通过 chrome.tabInstance.getDeviceInfo() 获取真实版本号（如 1.9.22(10109022)）
-export async function fetchTabbitVersion(port = DEFAULT_PORT) {
+export async function fetchTabbitVersion(port = DEFAULT_PORT, baseUrl = DEFAULT_BASE) {
   const targets = await listTargets(port);
-  const page = findTabbitPage(targets);
-  if (!page) throw new Error('浏览器未打开 web.tabbit.ai 页面');
+  const page = findTabbitPage(targets, baseUrl);
+  if (!page) throw new Error(`浏览器未打开 ${baseUrl} 页面`);
 
   const expr = `(async () => {
     try {
@@ -95,10 +101,10 @@ export async function fetchTabbitVersion(port = DEFAULT_PORT) {
 }
 
 // 一键刷新：拉 cookie + 版本号，浏览器不可用时抛错由调用方兜底
-export async function refreshFromBrowser(port = DEFAULT_PORT) {
+export async function refreshFromBrowser({ port = DEFAULT_PORT, baseUrl = DEFAULT_BASE } = {}) {
   const [cookieInfo, version] = await Promise.all([
-    fetchTabbitCookies(port),
-    fetchTabbitVersion(port).catch(() => ''),
+    fetchTabbitCookies(port, baseUrl),
+    fetchTabbitVersion(port, baseUrl).catch(() => ''),
   ]);
   return { cookie: cookieInfo.cookie, count: cookieInfo.count, version };
 }
