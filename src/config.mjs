@@ -50,4 +50,6 @@ export const config = {
   cdpPort: Number(ENV.CDP_PORT || process.env.CDP_PORT || 9222),
   // cookie 自动刷新间隔（分钟）
   cookieRefreshMinutes: Number(ENV.COOKIE_REFRESH_MINUTES || process.env.COOKIE_REFRESH_MINUTES || 360),
+  // 附加功能：每日自动签到（随本代理启动，独立于代理请求链路）
+  autoCheckin: ['1', 'true', 'yes', 'on'].includes(String(ENV.TABBIT_AUTO_CHECKIN || process.env.TABBIT_AUTO_CHECKIN || '').trim().toLowerCase()),
 };

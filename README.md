@@ -160,6 +160,47 @@ Cookie 里的 JWT 约 7 天过期。与其每次手动重新导出,可让服务*
 > ⚠️ 自动刷新依赖 Node 22+ 内置的 WebSocket。Node 18/20 下该功能自动关闭(静默降级为手动配置 `.env`),不影响其余功能。
 > ⚠️ CDP 是 Chrome 系浏览器通用协议,`--remote-debugging-port` 在 Windows/macOS/Linux 行为一致,跨平台可用。
 
+## 每日自动签到(可选)
+
+Tabbit 个人中心有「每日签到」活动(连续签到领 usage / 桌面宠物权益)。本服务内置**纯 HTTP 签到**,随代理一起启动、无需弹浏览器、不依赖 CDP,完全独立于代理请求链路。
+
+### 原理(逆向扩展 popup 的接口)
+
+- 查状态:`GET {base}/api/commerce/activity/v1/sign-in/status?scene_codes=daily_sign_in&scene_codes=desktop_pet`
+- 签到:`POST {base}/api/commerce/activity/v1/sign-in`,body `{ request_no, scene_codes: [...] }`
+- 鉴权仅用 Cookie(与代理同一个 Cookie,由代理的 CDP 自动刷新保持新鲜)
+- `request_no` 为 32 位 hex(时间戳位 + 默认浏览器标记 + 随机位),已按扩展算法还原
+
+### 开启方法
+
+1. 在 env 文件里加一行(默认关闭):
+
+   ```bash
+   TABBIT_AUTO_CHECKIN=1
+   ```
+
+2. 正常启动代理即可,签到会随服务一起运行:
+
+   ```bash
+   node src/server.mjs                 # 读 .env(国际版)
+   node src/server.mjs --profile domestic  # 读 .env.domestic(国内版)
+   ```
+
+   启动横幅会显示 `每日自动签到: 开`。**启动立即签到一次**,之后每天 00:00:30 自动循环,无需 cron/launchd。
+
+### 独立 CLI(可选)
+
+不想随代理启动,也可以单独跑:
+
+```bash
+node scripts/checkin-api.mjs              # 常驻:国内+国际都签,每日循环
+node scripts/checkin-api.mjs --once       # 只跑一轮(测试用)
+node scripts/checkin-api.mjs --profile domestic  # 只签国内版
+# npm 别名: npm run checkin / checkin:once / checkin:dom / checkin:intl
+```
+
+> ⚠️ 签到仅使用当前实例 env 文件里的 Cookie。国际版(`.env` / `web.tabbit.ai`)与国内版(`.env.domestic` / `web.tabbit.com`)是**两个不同账号体系**,Cookie 不能混用——各版本用各自的 env 文件即可。
+
 ## 配置项(.env)
 
 | 变量 | 必填 | 默认 | 说明 |
@@ -172,6 +213,7 @@ Cookie 里的 JWT 约 7 天过期。与其每次手动重新导出,可让服务*
 | `API_KEY` | ❌ 否 | 空(不校验) | 代理鉴权 key |
 | `CDP_PORT` | ❌ 否 | `9222` | 本机 Tabbit 调试端口(开启自动刷新需要) |
 | `COOKIE_REFRESH_MINUTES` | ❌ 否 | `360` | Cookie 自动刷新间隔(分钟,设 `0` 可关闭定时刷新) |
+| `TABBIT_AUTO_CHECKIN` | ❌ 否 | 空(关) | `1` 开启每日自动签到(随代理启动,每日 00:00:30 循环) |
 
 > \* 开启 Cookie 自动刷新后 `TABBIT_COOKIE` 可留空:服务启动时会从运行中的 Tabbit 浏览器(需 `--remote-debugging-port=9222`)拉取并写回 `.env`。
 
@@ -226,8 +268,10 @@ tabbit2api/
 │   └── config.mjs              # 配置加载
 ├── scripts/
 │   ├── probe.mjs               # 探测脚本(验证 Cookie/签名/聊天是否通)
+│   ├── checkin-api.mjs         # 每日签到 CLI(独立跑;或由 server 随代理拉起)
 │   └── lib/
 │       ├── cdp.mjs             # 零依赖 CDP 客户端:Cookie/版本号自动拉取
+│       ├── checkin.mjs         # 每日签到核心(纯 HTTP,env 开关 TABBIT_AUTO_CHECKIN)
 │       └── tabbit.mjs          # ★ 逆向核心:签名/指纹/SSE/会话/聊天
 ├── cookie-helper-extension/    # Chrome 扩展:导出 Cookie + 抓请求
 ├── docs/                       # 协议文档 + 实现路线图
