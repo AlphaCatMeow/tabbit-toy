@@ -106,7 +106,8 @@ curl http://localhost:8787/v1/chat/completions ^
 |------|------|------|
 | `GET` | `/v1/models` | 模型列表(OpenAI 格式) |
 | `POST` | `/v1/chat/completions` | 聊天补全(支持 `stream: true/false`) |
-| `GET` | `/healthz` | 健康检查(Cookie 是否有效 + 会话数) |
+| `GET` | `/healthz` | 健康检查(Cookie 是否有效 + 会话数 + 自动刷新状态) |
+| `POST` | `/admin/refresh-cookie` | 手动触发一次 Cookie 刷新(从本机 Tabbit 浏览器拉取) |
 
 ## 可用模型
 
@@ -126,15 +127,52 @@ curl http://localhost:8787/v1/chat/completions ^
 
 > ⭐ Pro 会员模型需要:① 账号设过默认浏览器 ② 请求头 `unique-uuid` 标记位 = 1(本项目已自动处理)
 
+## Cookie 自动刷新(可选,推荐)
+
+Cookie 里的 JWT 约 7 天过期。与其每次手动重新导出,可让服务**自动从本机运行的 Tabbit 浏览器拉取最新 Cookie**——浏览器原生层会在 JWT 快过期时静默续期,所以服务拿到的永远是最新的。
+
+### 开启方法
+
+1. 用调试端口启动 Tabbit(一次性,之后日常使用都带这个参数即可):
+
+   ```bash
+   # macOS
+   open -a Tabbit --args --remote-debugging-port=9222
+   # Windows / Linux:在 Tabbit 快捷方式「目标」后追加 --remote-debugging-port=9222
+   ```
+
+2. 保持 Tabbit 停留在 `web.tabbit.ai` 页面(任意会话页即可)。
+
+3. 启动服务。此时 `.env` 里**可以留空 `TABBIT_COOKIE`**,服务启动时会自动从浏览器拉取并写回 `.env`:
+
+   ```bash
+   node src/server.mjs
+   ```
+
+### 刷新策略
+
+- **启动时**:若 `.env` 中无有效 Cookie,自动从浏览器拉取一次
+- **定时**:每 `COOKIE_REFRESH_MINUTES`(默认 360 分钟 = 6 小时)后台刷新
+- **按需**:请求遇到 401/403/492/493 等鉴权错误时立即刷新重试
+- **手动**:`POST /admin/refresh-cookie` 强制刷新
+- **兜底**:浏览器未开 / 未带调试端口 / 未登录 → 刷新静默失败,继续使用 `.env` 中上次的 Cookie(日志会提示)。刷新成功后会写回 `.env`,即使浏览器关闭、重启服务也能用最近一次有效 Cookie
+
+> ⚠️ 自动刷新依赖 Node 22+ 内置的 WebSocket。Node 18/20 下该功能自动关闭(静默降级为手动配置 `.env`),不影响其余功能。
+> ⚠️ CDP 是 Chrome 系浏览器通用协议,`--remote-debugging-port` 在 Windows/macOS/Linux 行为一致,跨平台可用。
+
 ## 配置项(.env)
 
 | 变量 | 必填 | 默认 | 说明 |
 |------|------|------|------|
-| `TABBIT_COOKIE` | ✅ 是 | — | web.tabbit.ai 域下完整 Cookie |
+| `TABBIT_COOKIE` | ❌ 否* | — | web.tabbit.ai 域下完整 Cookie(留空则启动时从浏览器自动拉取) |
 | `TABBIT_VERSION` | ✅ 是 | `1.1.39(10101039)` | 真实版本号(来自 getDeviceInfo) |
 | `TABBIT_SIGN_KEY` | ❌ 否 | 自动拉取 | HMAC 签名 key |
 | `PORT` | ❌ 否 | `8787` | 服务端口 |
 | `API_KEY` | ❌ 否 | 空(不校验) | 代理鉴权 key |
+| `CDP_PORT` | ❌ 否 | `9222` | 本机 Tabbit 调试端口(开启自动刷新需要) |
+| `COOKIE_REFRESH_MINUTES` | ❌ 否 | `360` | Cookie 自动刷新间隔(分钟,设 `0` 可关闭定时刷新) |
+
+> \* 开启 Cookie 自动刷新后 `TABBIT_COOKIE` 可留空:服务启动时会从运行中的 Tabbit 浏览器(需 `--remote-debugging-port=9222`)拉取并写回 `.env`。
 
 ## 项目结构
 
@@ -146,6 +184,7 @@ tabbit2api/
 ├── scripts/
 │   ├── probe.mjs               # 探测脚本(验证 Cookie/签名/聊天是否通)
 │   └── lib/
+│       ├── cdp.mjs             # 零依赖 CDP 客户端:Cookie/版本号自动拉取
 │       └── tabbit.mjs          # ★ 逆向核心:签名/指纹/SSE/会话/聊天
 ├── cookie-helper-extension/    # Chrome 扩展:导出 Cookie + 抓请求
 ├── docs/                       # 协议文档 + 实现路线图
@@ -158,7 +197,7 @@ tabbit2api/
 <details>
 <summary><b>Cookie 过期了怎么办?</b></summary>
 
-JWT token 有效期约 7 天。过期后用扩展重新导出一次 Cookie,更新 `.env` 里的 `TABBIT_COOKIE` 重启服务即可。
+JWT token 有效期约 7 天。若已开启 [Cookie 自动刷新](#cookie-自动刷新可选推荐),服务会每 6 小时自动从本机 Tabbit 浏览器拉取最新 Cookie,无需手动操作;浏览器关闭后 `.env` 中仍保留上次有效 Cookie 可继续使用。未开启自动刷新时,过期后用扩展重新导出一次 Cookie 更新 `.env` 里的 `TABBIT_COOKIE` 重启服务即可。
 </details>
 
 <details>
