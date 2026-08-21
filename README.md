@@ -182,15 +182,24 @@ Tabbit 国际版与国内版**协议完全一致**(相同的 `/chat/sign-key`、
 国内版内置国产模型(DeepSeek / 豆包 / Kimi / 通义 / GLM 等),国际版内置 Claude / Gemini / GPT 等。两个版本**同时跑在同一台机器**用「双实例」即可,互不干扰:
 
 ```bash
-# ── 实例 A:国际版(默认) ──
-PORT=8787 CDP_PORT=9222 TABBIT_BASE_URL=https://web.tabbit.ai \
-  TABBIT_COOKIE="<国际版 cookie>" node src/server.mjs
+# 每个实例用独立 env 文件 + 一行启动（推荐）
+#   --profile <name> 等价 TABBIT_ENV=.env.<name>
+#   npm 脚本 start:intl / start:dom 已封装好
+
+# ── 实例 A:国际版 ──
+npm run start:intl            # 读 .env.intl    → http://localhost:8787
+# 等价: TABBIT_ENV=.env.intl node src/server.mjs
+# 等价: node src/server.mjs --profile intl
 
 # ── 实例 B:国内版 ──
 # 国内版客户端需以不同的 --remote-debugging-port 启动(不能共用 9222)
-PORT=8788 CDP_PORT=9223 TABBIT_BASE_URL=https://web.tabbit-ai.com \
-  TABBIT_COOKIE="<国内版 cookie>" node src/server.mjs
+npm run start:dom             # 读 .env.domestic → http://localhost:8788
+# 等价: TABBIT_ENV=.env.domestic node src/server.mjs
+# 等价: node src/server.mjs --profile domestic
 ```
+
+> 国内版后端域名实测为 `https://web.tabbit.com`（非早前猜测的 `web.tabbit-ai.com`）。
+> 三种启动方式完全等价,按需选择;端口 / CDP 端口 / 后端域名都写在各自的 `.env.<profile>` 里,无需每次敲一长串环境变量。
 
 客户端侧(自动刷新需要):
 

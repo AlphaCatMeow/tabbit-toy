@@ -4,6 +4,7 @@ import { readFileSync, existsSync } from 'node:fs';
 
 // 每个实例可用独立 env 文件（多版本共存时互不干扰）：
 //   TABBIT_ENV=.env.domestic node src/server.mjs
+//   或简写： node src/server.mjs --profile domestic   （等价 .env.domestic）
 function loadEnvFile(path = '.env') {
   const env = {};
   if (existsSync(path)) {
@@ -16,7 +17,16 @@ function loadEnvFile(path = '.env') {
 }
 
 // 注意：TABBIT_ENV 本身只能来自 shell 环境变量（文件还没读之前就需要它）
-const ENV_PATH = process.env.TABBIT_ENV || '.env';
+// 支持 --profile <name> 简写：优先级 TABBIT_ENV > --profile > 默认 .env
+function parseProfileArg(argv = process.argv) {
+  const eq = argv.find(a => a.startsWith('--profile='));
+  if (eq) return eq.slice('--profile='.length);
+  const i = argv.indexOf('--profile');
+  if (i !== -1 && argv[i + 1]) return argv[i + 1];
+  return null;
+}
+const PROFILE = parseProfileArg();
+const ENV_PATH = process.env.TABBIT_ENV || (PROFILE ? `.env.${PROFILE}` : '.env');
 const ENV = loadEnvFile(ENV_PATH);
 
 export const config = {
