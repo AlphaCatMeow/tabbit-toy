@@ -11,6 +11,10 @@
     "probe:nopro": "node scripts/probe.mjs --no-pro",
     "start": "node src/server.mjs",
     "start:intl": "node src/server.mjs --profile intl",
-    "start:dom": "node src/server.mjs --profile domestic"
+    "start:dom": "node src/server.mjs --profile domestic",
+    "checkin": "node scripts/checkin-api.mjs",
+    "checkin:once": "node scripts/checkin-api.mjs --once",
+    "checkin:dom": "node scripts/checkin-api.mjs --profile domestic",
+    "checkin:intl": "node scripts/checkin-api.mjs --profile intl"
   }
 }
