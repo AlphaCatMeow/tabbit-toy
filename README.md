@@ -207,7 +207,7 @@ node scripts/checkin-api.mjs --profile domestic  # 只签国内版
 |------|------|------|------|
 | `TABBIT_COOKIE` | ❌ 否* | — | web.tabbit.ai 域下完整 Cookie(留空则启动时从浏览器自动拉取) |
 | `TABBIT_VERSION` | ✅ 是 | `1.1.39(10101039)` | 真实版本号(来自 getDeviceInfo) |
-| `TABBIT_BASE_URL` | ❌ 否 | `https://web.tabbit.ai` | Web 后端地址。**国内版改为对应域名**(如 `https://web.tabbit-ai.com`)即可兼容,协议完全一致 |
+| `TABBIT_BASE_URL` | ❌ 否 | `https://web.tabbit.ai` | Web 后端地址。**国内版改为对应域名**(如 `https://web.tabbit.com`)即可兼容,协议完全一致 |
 | `TABBIT_SIGN_KEY` | ❌ 否 | 自动拉取 | HMAC 签名 key |
 | `PORT` | ❌ 否 | `8787` | 服务端口 |
 | `API_KEY` | ❌ 否 | 空(不校验) | 代理鉴权 key |

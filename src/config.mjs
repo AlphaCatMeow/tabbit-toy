@@ -38,7 +38,7 @@ export const config = {
   // Tabbit 版本号，用于 x-req-ctx 头（来自 getDeviceInfo().tabbitVersion）
   version: ENV.TABBIT_VERSION || process.env.TABBIT_VERSION || '1.1.39(10101039)',
   // Tabbit Web 后端地址。国际版默认 https://web.tabbit.ai；
-  // 国内版改为对应域名（如 https://web.tabbit-ai.com）即可兼容，协议完全一致。
+  // 国内版改为对应域名（如 https://web.tabbit.com）即可兼容，协议完全一致。
   baseUrl: (ENV.TABBIT_BASE_URL || process.env.TABBIT_BASE_URL || 'https://web.tabbit.ai').replace(/\/$/, ''),
   // 签名 key（留空则自动从 /chat/sign-key 拉取并定期刷新）
   signKey: ENV.TABBIT_SIGN_KEY || process.env.TABBIT_SIGN_KEY || '',

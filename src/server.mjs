@@ -23,6 +23,8 @@
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { isAbsolute } from 'node:path';
 import { config } from './config.mjs';
 import {
   DEFAULT_SIGN_KEY, fetchSignKey, getModels, fetchSessionList, chat, TabbitError,
@@ -79,10 +81,15 @@ async function refreshCookieFromBrowser(force = false) {
 // 浏览器关闭后重启服务仍可用
 function persistEnv() {
   try {
-    const envPath = new URL('../' + config.envFile, import.meta.url).pathname;
+    // isAbsolute 兼容 TABBIT_ENV 传入绝对路径(如 /etc/x.env 或 D:\x.env)；
+    // 相对路径仍按 server.mjs 所在目录回退到项目根
+    const envPath = isAbsolute(config.envFile)
+      ? config.envFile
+      : fileURLToPath(new URL('../' + config.envFile, import.meta.url));
     let content = readFileSync(envPath, 'utf8');
-    content = content.replace(/^TABBIT_COOKIE=.*$/m, `TABBIT_COOKIE=${cookie}`);
-    content = content.replace(/^TABBIT_VERSION=.*$/m, `TABBIT_VERSION=${version}`);
+    // 函数替换:避免 cookie/version 含 $&/$1/$' 时被 String.replace 当作匹配模式
+    content = content.replace(/^TABBIT_COOKIE=.*$/m, () => `TABBIT_COOKIE=${cookie}`);
+    content = content.replace(/^TABBIT_VERSION=.*$/m, () => `TABBIT_VERSION=${version}`);
     writeFileSync(envPath, content);
   } catch (e) {
     log('写回', config.envFile, '失败:', e.message);
