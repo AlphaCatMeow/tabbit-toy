@@ -166,6 +166,7 @@ Cookie 里的 JWT 约 7 天过期。与其每次手动重新导出,可让服务*
 |------|------|------|------|
 | `TABBIT_COOKIE` | ❌ 否* | — | web.tabbit.ai 域下完整 Cookie(留空则启动时从浏览器自动拉取) |
 | `TABBIT_VERSION` | ✅ 是 | `1.1.39(10101039)` | 真实版本号(来自 getDeviceInfo) |
+| `TABBIT_BASE_URL` | ❌ 否 | `https://web.tabbit.ai` | Web 后端地址。**国内版改为对应域名**(如 `https://web.tabbit-ai.com`)即可兼容,协议完全一致 |
 | `TABBIT_SIGN_KEY` | ❌ 否 | 自动拉取 | HMAC 签名 key |
 | `PORT` | ❌ 否 | `8787` | 服务端口 |
 | `API_KEY` | ❌ 否 | 空(不校验) | 代理鉴权 key |
@@ -173,6 +174,48 @@ Cookie 里的 JWT 约 7 天过期。与其每次手动重新导出,可让服务*
 | `COOKIE_REFRESH_MINUTES` | ❌ 否 | `360` | Cookie 自动刷新间隔(分钟,设 `0` 可关闭定时刷新) |
 
 > \* 开启 Cookie 自动刷新后 `TABBIT_COOKIE` 可留空:服务启动时会从运行中的 Tabbit 浏览器(需 `--remote-debugging-port=9222`)拉取并写回 `.env`。
+
+## 多版本共存（国际版 + 国内版）
+
+Tabbit 国际版与国内版**协议完全一致**(相同的 `/chat/sign-key`、`/proxy/v1/model_config/models`、`/api/v1/chat/completion`、相同签名/HMAC/SSE 格式),仅后端域名与内置模型列表不同。因此本代理**无需改代码即可兼容国内版**,只需指定 `TABBIT_BASE_URL`。
+
+国内版内置国产模型(DeepSeek / 豆包 / Kimi / 通义 / GLM 等),国际版内置 Claude / Gemini / GPT 等。两个版本**同时跑在同一台机器**用「双实例」即可,互不干扰:
+
+```bash
+# 每个实例用独立 env 文件 + 一行启动（推荐）
+#   --profile <name> 等价 TABBIT_ENV=.env.<name>
+#   npm 脚本 start:intl / start:dom 已封装好
+
+# ── 实例 A:国际版 ──
+npm run start:intl            # 读 .env.intl    → http://localhost:8787
+# 等价: TABBIT_ENV=.env.intl node src/server.mjs
+# 等价: node src/server.mjs --profile intl
+
+# ── 实例 B:国内版 ──
+# 国内版客户端需以不同的 --remote-debugging-port 启动(不能共用 9222)
+npm run start:dom             # 读 .env.domestic → http://localhost:8788
+# 等价: TABBIT_ENV=.env.domestic node src/server.mjs
+# 等价: node src/server.mjs --profile domestic
+```
+
+> 国内版后端域名实测为 `https://web.tabbit.com`（非早前猜测的 `web.tabbit-ai.com`）。
+> 三种启动方式完全等价,按需选择;端口 / CDP 端口 / 后端域名都写在各自的 `.env.<profile>` 里,无需每次敲一长串环境变量。
+
+客户端侧(自动刷新需要):
+
+```bash
+# 国际版
+open -a "Tabbit" --args --remote-debugging-port=9222
+# 国内版(用各自的应用名 / 端口)
+open -a "Tabbit 国内版" --args --remote-debugging-port=9223
+```
+
+要点:
+
+- 每个实例必须有**独立的 `.env` / 环境变量**:各自的 `TABBIT_COOKIE`、`TABBIT_BASE_URL`、`PORT`、`CDP_PORT`。两套 cookie 分别来自各自登录态,**不能混用**。
+- 两个 Tabbit 客户端**不能用同一个调试端口**,否则 CDP 只会连到其中一个。
+- 用不同 `PORT` 区分:OpenAI 客户端里把 `base_url` 指向 `http://localhost:8787`(国际)或 `http://localhost:8788`(国内)即可切换。
+- `cookie-helper-extension` 导出时,确认浏览器当前处于对应版本域名下,导出的是该域的 Cookie。
 
 ## 项目结构
 

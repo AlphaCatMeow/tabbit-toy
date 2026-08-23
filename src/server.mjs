@@ -49,7 +49,7 @@ async function refreshCookieFromBrowser(force = false) {
 
   cookieRefreshInFlight = (async () => {
     try {
-      const { cookie: fresh, count, version: freshVersion } = await refreshFromBrowser(config.cdpPort);
+      const { cookie: fresh, count, version: freshVersion } = await refreshFromBrowser({ port: config.cdpPort, baseUrl: config.baseUrl });
       if (!fresh) throw new Error('浏览器返回空 cookie');
       cookie = fresh;
       if (freshVersion && freshVersion !== version) {
@@ -70,16 +70,17 @@ async function refreshCookieFromBrowser(force = false) {
   return cookieRefreshInFlight;
 }
 
-// 把最新 cookie / 版本号持久化到 .env，浏览器关闭后重启服务仍可用
+// 把最新 cookie / 版本号持久化到当前实例的 env 文件（默认 .env，可用 TABBIT_ENV 指定），
+// 浏览器关闭后重启服务仍可用
 function persistEnv() {
   try {
-    const envPath = new URL('../.env', import.meta.url).pathname;
+    const envPath = new URL('../' + config.envFile, import.meta.url).pathname;
     let content = readFileSync(envPath, 'utf8');
     content = content.replace(/^TABBIT_COOKIE=.*$/m, `TABBIT_COOKIE=${cookie}`);
     content = content.replace(/^TABBIT_VERSION=.*$/m, `TABBIT_VERSION=${version}`);
     writeFileSync(envPath, content);
   } catch (e) {
-    log('写回 .env 失败:', e.message);
+    log('写回', config.envFile, '失败:', e.message);
   }
 }
 

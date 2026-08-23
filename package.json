@@ -9,6 +9,8 @@
     "probe:chat": "node scripts/probe.mjs --step chat",
     "probe:models": "node scripts/probe.mjs --step models",
     "probe:nopro": "node scripts/probe.mjs --no-pro",
-    "start": "node src/server.mjs"
+    "start": "node src/server.mjs",
+    "start:intl": "node src/server.mjs --profile intl",
+    "start:dom": "node src/server.mjs --profile domestic"
   }
 }
