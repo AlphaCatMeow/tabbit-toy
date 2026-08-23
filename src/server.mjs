@@ -6,6 +6,10 @@
 //   GET  /healthz              健康检查
 //   POST /admin/refresh-cookie 手动触发 cookie 自动刷新（从本机 Tabbit 浏览器拉取）
 //
+// 附加功能（可选，env 开关 TABBIT_AUTO_CHECKIN=1 控制）：
+//   每日自动签到 —— 随本代理启动，启动即签到一次，之后每日 00:00:30 循环；
+//   独立于代理请求链路，不影响 LLM 代理功能。核心逻辑见 scripts/lib/checkin.mjs。
+//
 // Cookie 自动续期：
 //   - 启动时若本机 Tabbit 以 --remote-debugging-port 运行，自动从浏览器拉取最新 cookie
 //   - 每 COOKIE_REFRESH_MINUTES（默认 360）分钟后台刷新一次
@@ -24,6 +28,7 @@ import {
   DEFAULT_SIGN_KEY, fetchSignKey, getModels, fetchSessionList, chat, TabbitError,
 } from '../scripts/lib/tabbit.mjs';
 import { refreshFromBrowser } from '../scripts/lib/cdp.mjs';
+import { startAutoCheckin } from '../scripts/lib/checkin.mjs';
 
 // ─── 状态缓存 ─────────────────────────────────────────────
 let signKey = config.signKey || DEFAULT_SIGN_KEY;
@@ -383,6 +388,7 @@ server.listen(config.port, () => {
   console.log(`  鉴权: ${config.apiKey ? '已开启 (Bearer ' + config.apiKey.slice(0, 4) + '…)' : '未开启'}`);
   console.log(`  版本: ${version}`);
   console.log(`  Cookie自动刷新: ${cookie ? '开' : '开（启动时从浏览器拉取）'} (CDP :${config.cdpPort}, 每 ${config.cookieRefreshMinutes} 分钟)`);
+  console.log(`  每日自动签到: ${config.autoCheckin ? '开（启动即签，每日 00:00:30 循环）' : '关（env 设 TABBIT_AUTO_CHECKIN=1 开启）'}`);
   console.log('───────────────────────────────────────────────────────────');
   console.log('  GET  /v1/models             模型列表');
   console.log('  POST /v1/chat/completions   聊天补全 (stream / 非 stream)');
@@ -396,3 +402,16 @@ server.listen(config.port, () => {
 refreshCookieFromBrowser(true);
 // 定时后台刷新（COOKIE_REFRESH_MINUTES，默认 6 小时）
 setInterval(() => refreshCookieFromBrowser(), COOKIE_REFRESH_MS).unref();
+
+// 附加功能：每日自动签到（env 开关 TABBIT_AUTO_CHECKIN=1 控制；独立于代理请求链路）
+// 只签本实例的 profile（env 文件对应的版本），启动即签，之后每日 00:00:30 循环。
+if (config.autoCheckin) {
+  const envFile = config.envFile; // 当前实例的 env 文件（.env 或 .env.domestic）
+  const profileName = envFile === '.env' ? 'intl' : envFile.replace(/^\.env\.?/, '') || 'default';
+  startAutoCheckin({
+    name: profileName,
+    envFile,
+    base: config.baseUrl,
+    cdpPort: config.cdpPort,
+  });
+}
